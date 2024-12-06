@@ -13,7 +13,12 @@ cd Streamlit_Dockspot
 ```bash
 ./first_setup.sh
 ```
-### 2. You can run the app in local now.
+### 3. You can run the app in local now.
 ```bash
 streamlit run main.py
 ```
+
+## Test Data
+
+This repository contains test data that can be used for testing the functionality of the project. The test data is located in the `testdata` directory. 
+

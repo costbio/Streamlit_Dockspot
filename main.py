@@ -3,7 +3,7 @@ import streamlit as st
 # Define the pages
 pages = {
     "Step 1: Job Input App": "job_input_app.py",
-    "Step 2: Pocket Selector App": "additional_app.py",
+    "Step 2: Pocket Selector App": "pocket_selector_app.py",
     "Progress Tracker": "progress_tracker_app.py"
 }
 
