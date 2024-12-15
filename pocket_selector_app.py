@@ -68,6 +68,15 @@ if job_id_input:
                         depth=clustering_depth,
                         plot=True
                     )
+
+                    # Save clustering results to session state
+                    st.session_state['full_heatmap'] = full_heatmap
+                    st.session_state['rep_heatmap'] = rep_heatmap
+                    st.session_state['dataindex'] = dataindex
+                    st.session_state['repdataindex'] = repdataindex
+                    st.session_state['aminoacid_list'] = aminoacid_list
+                    st.session_state['clustering_done'] = True
+
                     # Save the representative pockets to a CSV file
                     df_rep_pockets.to_csv(output_file_path, index=False)
                     st.success("Clustering completed. Representatives saved.")
@@ -82,9 +91,9 @@ if job_id_input:
                 # Full Heatmap
                 if st.checkbox("Show Full Heatmap"):
                     st.write("Full dataset heatmap:")
-                    reordered_matrix = full_heatmap.data2d
-                    y_labels = dataindex
-                    x_labels = aminoacid_list
+                    reordered_matrix = st.session_state['full_heatmap'].data2d
+                    y_labels = st.session_state['dataindex']
+                    x_labels = st.session_state['aminoacid_list']
 
                     fig = go.Figure(data=go.Heatmap(z=reordered_matrix, y=y_labels, x=x_labels,
                                                     hovertemplate="<b>Amino Acid:%{x}</b><br><b>%{y}</b><br>", colorscale='YlOrRd'))
@@ -97,9 +106,9 @@ if job_id_input:
                 # Filtered Heatmap
                 if st.checkbox("Show Heatmap with Representatives Only"):
                     st.write("Filtered heatmap (Representatives only):")
-                    rep_reordered_matrix = rep_heatmap.data2d
-                    y_labels = repdataindex
-                    x_labels = aminoacid_list
+                    rep_reordered_matrix = st.session_state['rep_heatmap'].data2d
+                    y_labels = st.session_state['repdataindex']
+                    x_labels = st.session_state['aminoacid_list']
                     
                     if len(x_labels) == rep_reordered_matrix.shape[1]:
                         rep_fig = go.Figure(data=go.Heatmap(z=rep_reordered_matrix, y=y_labels, x=x_labels,
