@@ -117,6 +117,11 @@ def cluster_pockets(p2rank_output_folder,pdb_location, depth, plot=True):
 
     one_letter_amino_acids = [amino_acid_map[aa] for aa in aminoacid_list]
 
+    ylabel = []
+    for i in range(len(one_letter_amino_acids)):
+        x = f"{residue_columns[i]}_{one_letter_amino_acids[i]}"
+        ylabel.append(x)
+
     #print(new_dict)
 
 
@@ -157,7 +162,7 @@ def cluster_pockets(p2rank_output_folder,pdb_location, depth, plot=True):
                 print(f"Error loading file {file_path}: {e}")
 
 
-    return df_rep_pockets, full_heatmap, rep_heatmap, dataindex, repdataindex, one_letter_amino_acids
+    return df_rep_pockets, full_heatmap, rep_heatmap, dataindex, repdataindex, ylabel
 
 
 def main(csv_file_path, output_file_path, pdb_location, clustering_depth):
