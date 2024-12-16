@@ -1,5 +1,7 @@
 import streamlit as st
+import stmol
 import os
+import io
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,8 +11,16 @@ from data_analysis.step3_clustering_conf_creator import cluster_pockets
 import nglview as nv
 from IPython.display import display
 import plotly.graph_objs as go
+from st_aggrid import AgGrid, GridOptionsBuilder
 
-
+st.markdown("""
+    <style>
+    .fixed-column {
+        height: 600px;  /* Set a fixed height for the second column */
+        overflow-y: auto;  /* Make it scrollable if content exceeds the height */
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Base folder for jobs
 BASE_JOB_FOLDER = 'streamlit_jobs'
@@ -33,6 +43,21 @@ def update_status(job_id, status, step=None):
     statuses[job_id] = {'status': status, 'step': step}
     with open(STATUS_FILE, 'w') as f:
         json.dump(statuses, f)
+
+#Function for viewing protein structures
+def render_structure_with_residues(structure_file_path, res_list):
+    # Read the .pdb file and wrap it with BytesIO
+    with open(structure_file_path, "rb") as f:
+        pdb_data = io.BytesIO(f.read())
+
+    # Upload the structure to the viewer
+    viewer = stmol.obj_upload(pdb_data)
+
+    # Render specific residues
+    viewer = stmol.render_pdb_resi(viewer, res_list)
+
+    # Display the structure
+    stmol.showmol(viewer, height=500, width=700)
 
 # Streamlit UI
 st.title("Pocket Selector App")
@@ -70,6 +95,7 @@ if job_id_input:
                     )
 
                     # Save clustering results to session state
+                    st.session_state['df_rep_pockets'] = df_rep_pockets
                     st.session_state['full_heatmap'] = full_heatmap
                     st.session_state['rep_heatmap'] = rep_heatmap
                     st.session_state['dataindex'] = dataindex
@@ -103,50 +129,74 @@ if job_id_input:
                         yaxis=dict(title='Clusters'))
                     st.plotly_chart(fig)
 
-                # Filtered Heatmap
-                if st.checkbox("Show Heatmap with Representatives Only"):
+                # Create two columns
+                col1, col2 = st.columns([3, 1])
+
+                with col1:
+                    # Filtered heatmap
                     st.write("Filtered heatmap (Representatives only):")
                     rep_reordered_matrix = st.session_state['rep_heatmap'].data2d
                     y_labels = st.session_state['repdataindex']
                     x_labels = st.session_state['aminoacid_list']
+                    chosen_points = []
                     
                     if len(x_labels) == rep_reordered_matrix.shape[1]:
                         rep_fig = go.Figure(data=go.Heatmap(z=rep_reordered_matrix, y=y_labels, x=x_labels,
-                                                    hovertemplate="<b>Amino Acid:%{x}</b><br><b>%{y}</b><br>", colorscale='YlOrRd'))
+                                                            hovertemplate="<b>Amino Acid:%{x}</b><br><b>%{y}</b><br>", colorscale='YlOrRd'))
                         rep_fig.update_layout(
                             title='Interactive Heatmap with Clustering',
                             xaxis=dict(title='Amino Acids'),
                             yaxis=dict(title='Clusters'))
+                        
                         st.plotly_chart(rep_fig)
                     else:
                         st.error("Mismatch in the number of residue names and columns in the heatmap matrix.")
-                        a = len(aminoacid_list)
+                        a = len(x_labels)
                         b = rep_reordered_matrix.shape[1]
                         st.error(f"{a},{b}")
 
-                    
-                # Step 4: Residue Viewer
-                st.header("Step 4: Residue Viewer")
-                test_data_name = st.text_input("Enter test data name (e.g., 'test_data_26')")
+                # Step 4: Heatmap rep chooser.
+                # Display a table for representatives with checkboxes
+                with col2:
+                    st.write("Chooser")
+                    with st.container():
+                        # Apply the scrollable class to make the column content scrollable
+                        st.markdown('<div class="stScrollBox">', unsafe_allow_html=True)
 
-                if test_data_name:
-                    # Extract the residue information for the given test data name
-                    residues = df[df['test_data_name'] == test_data_name]['residues'].tolist()
+                        # Create checkboxes for each row label
+                        chosen_points = []
+                        for i, label in enumerate(y_labels):
+                            checkbox = st.checkbox(f"Select {label}", key=f"checkbox_{i}")
+                            if checkbox:
+                                chosen_points.append(label)
 
-                    if residues:
-                        st.write(f"Residues for {test_data_name}: {residues}")
-                    else:
-                        st.error(f"No residues found for {test_data_name}")
-                        
-                    # Optionally display the protein structure
-                    if st.checkbox("Show Protein Structure"):
-                        try:
-                            view = nv.show_structure_file(f"{pdb_location}/{test_data_name}.pdb")
-                            view.add_cartoon()
-                            display(view)
-                        except Exception as e:
-                            st.error(f"Error loading structure for {test_data_name}: {e}")
+                        st.markdown('</div>', unsafe_allow_html=True)  # Closing div tag=True
 
+                    # Display 3D structure for each selected representative
+                    if chosen_points:
+                        st.header("3D Structures for Selected Representatives")
+                        for label in chosen_points:
+                            df = df_rep_pockets
+                            label = [label]  # Convert to a list
+                            filename = df.loc[df.index.isin(label), 'File name'].iloc[0]
+                            pdb_file = os.path.join(pdb_location, f"{filename}.pdb")
+                            
+                            if os.path.exists(pdb_file):
+                                st.subheader(f"Structure for {label}")
+                                render_structure_with_residues(pdb_file, ["1", "2", "900"])
+                                
+                            else:
+                                st.warning(f"PDB file for {label} not found. Path was {pdb_file}")
+
+                    # Save selected checkboxes to a text file
+                    if st.button("Save selections"):
+                        if chosen_points:
+                            with open("chosen_representatives.txt", "w") as f:
+                                for point in chosen_points:
+                                    f.write(f"{point}\n")
+                            st.success("Selections saved to 'chosen_representatives.txt'.")
+                        else:
+                            st.warning("No representatives selected.")
         else:
             st.error("Necessary files not found in the job folder. Please ensure the job has been processed correctly.")
     else:

@@ -32,7 +32,7 @@ def cluster_pockets(p2rank_output_folder,pdb_location, depth, plot=True):
     for i in range(0,len(residue_list)):
         res = residue_list[i]
         data[res] = residues_encoded[:,i]
-    data['frame_pocket'] = ['Frame:{}, Index:{}'.format(f, p) for f, p in zip(map(str, data['Frame']), map(str, data['pocket_index']))]
+    data['frame_pocket'] = ['Frame:{} Index:{}'.format(f, p) for f, p in zip(map(str, data['Frame']), map(str, data['pocket_index']))]
     data.index = data['frame_pocket']
     dataindex = data['frame_pocket']
     data_2cluster = data.drop(columns=['File name','Frame','pocket_index','probability','residues','frame_pocket'])
@@ -124,7 +124,7 @@ def cluster_pockets(p2rank_output_folder,pdb_location, depth, plot=True):
 
     df_rep_pockets = pd.DataFrame(list_rep_pockets)
 
-    df_rep_pockets['frame_pocket'] = ['Frame:{}, Index:{}'.format(f, p) for f, p in zip(map(str, df_rep_pockets['Frame']), map(str, df_rep_pockets['pocket_index']))]
+    df_rep_pockets['frame_pocket'] = ['Frame:{} Index:{}'.format(f, p) for f, p in zip(map(str, df_rep_pockets['Frame']), map(str, df_rep_pockets['pocket_index']))]
     df_rep_pockets.index = df_rep_pockets['frame_pocket']
     repdataindex = df_rep_pockets['frame_pocket']
     data_2cluster = df_rep_pockets.drop(columns=['File name','Frame','pocket_index','probability','residues','frame_pocket'])
