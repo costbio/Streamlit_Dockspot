@@ -172,21 +172,46 @@ if job_id_input:
 
                         st.markdown('</div>', unsafe_allow_html=True)  # Closing div tag=True
 
-                    # Display 3D structure for each selected representative
-                    if chosen_points:
-                        st.header("3D Structures for Selected Representatives")
-                        for label in chosen_points:
+                if chosen_points:
+                    st.header("3D Structures for Selected Representatives")
+
+                    # Create two columns for each pair of structures
+                    num_chosen_points = len(chosen_points)
+                    for i in range(0, num_chosen_points, 2):
+                        # Ensure there's no index out of range error when creating columns
+                        col1, col2 = st.columns(2)
+                        
+                        # For the first column
+                        with col1:
+                            label_1 = chosen_points[i]
+                            df_rep_pockets = st.session_state['df_rep_pockets']
                             df = df_rep_pockets
-                            label = [label]  # Convert to a list
-                            filename = df.loc[df.index.isin(label), 'File name'].iloc[0]
-                            pdb_file = os.path.join(pdb_location, f"{filename}.pdb")
+                            label_1_filename = df.loc[df.index.isin([label_1]), 'File name'].iloc[0]
+                            pdb_file_1 = os.path.join(pdb_location, f"{label_1_filename}.pdb")
                             
-                            if os.path.exists(pdb_file):
-                                st.subheader(f"Structure for {label}")
-                                render_structure_with_residues(pdb_file, ["1", "2", "900"])
-                                
+                            if os.path.exists(pdb_file_1):
+                                st.subheader(f"Structure for {label_1}")
+                                nums = [col.split("_")[1] for col in df_rep_pockets.drop(columns=['File name','Frame','pocket_index','probability','residues',"frame_pocket"]).columns]
+                                render_structure_with_residues(pdb_file_1, nums)
                             else:
-                                st.warning(f"PDB file for {label} not found. Path was {pdb_file}")
+                                st.warning(f"PDB file for {label_1} not found. Path was {pdb_file_1}")
+
+                        # For the second column, only if there's a second item
+                        if i + 1 < num_chosen_points:
+                            with col2:
+                                label_2 = chosen_points[i + 1]
+                                label_2_filename = df.loc[df.index.isin([label_2]), 'File name'].iloc[0]
+                                pdb_file_2 = os.path.join(pdb_location, f"{label_2_filename}.pdb")
+                                
+                                if os.path.exists(pdb_file_2):
+                                    st.subheader(f"Structure for {label_2}")
+                                    nums = [col.split("_")[1] for col in df_rep_pockets.drop(columns=['File name','Frame','pocket_index','probability','residues',"frame_pocket"]).columns]
+                                    render_structure_with_residues(pdb_file_2, nums)
+                                else:
+                                    st.warning(f"PDB file for {label_2} not found. Path was {pdb_file_2}")
+
+                
+                
 
                     # Save selected checkboxes to a text file
                     if st.button("Save selections"):
