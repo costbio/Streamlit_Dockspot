@@ -190,7 +190,7 @@ if job_id_input:
                             pdb_file_1 = os.path.join(pdb_location, f"{label_1_filename}.pdb")
                             
                             if os.path.exists(pdb_file_1):
-                                st.subheader(f"Structure for {label_1}")
+                                st.subheader(f"{label_1}")
                                 nums = [col.split("_")[1] for col in df_rep_pockets.drop(columns=['File name','Frame','pocket_index','probability','residues',"frame_pocket"]).columns]
                                 render_structure_with_residues(pdb_file_1, nums)
                             else:
@@ -216,10 +216,17 @@ if job_id_input:
                     # Save selected checkboxes to a text file
                     if st.button("Save selections"):
                         if chosen_points:
-                            with open("chosen_representatives.txt", "w") as f:
+                            csv_path = os.path.join(processed_dir, "chosen_representatives.csv")
+                            with open(csv_path, "w") as f:
                                 for point in chosen_points:
-                                    f.write(f"{point}\n")
-                            st.success("Selections saved to 'chosen_representatives.txt'.")
+                                    df_rep_pockets = st.session_state['df_rep_pockets']
+                                    filtered_df = df_rep_pockets.loc[chosen_points]
+
+                                    # Save the filtered DataFrame to a CSV file
+                                    #csv_path = os.path.join(job_folder, "chosen_representatives.csv")
+                                    filtered_df.to_csv(csv_path, index=False)
+
+                                    st.success("Selections are saved to a dataframe.")
                         else:
                             st.warning("No representatives selected.")
         else:
