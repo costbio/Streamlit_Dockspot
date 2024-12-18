@@ -79,6 +79,7 @@ if job_id_input:
                 os.makedirs(ligand_folder, exist_ok=True)
 
                 prot_pdbqt_folder = os.path.join(pdbqt_folder,"protein_pdbqt_files")
+                os.makedirs(prot_pdbqt_folder, exist_ok=True)
 
                 # Loop through SMILES and process each ligand
                 for i, smiles in enumerate(ligands_smiles):
