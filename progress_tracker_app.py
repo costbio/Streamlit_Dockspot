@@ -9,7 +9,8 @@ if not os.path.exists(STATUS_FILE):
     with open(STATUS_FILE, 'w') as f:
         json.dump({}, f)
 
-st.title("Job Progress Tracker")
+# Inquiry form
+#st.title("Job Progress Tracker")
 
 # Function to load the job status
 def load_status():

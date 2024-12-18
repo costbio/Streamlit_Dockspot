@@ -30,10 +30,10 @@ def update_status(job_id, status, step=None):
         json.dump(statuses, f)
 
 # Streamlit UI
-st.title("Job Input App")
+#st.title("Job Input App")
 
 # Step 1: File Uploads
-st.header("Step 1: Upload Files")
+st.header("Upload Files")
 xtc_file = st.file_uploader("Upload Trajectory File (*.xtc file)", type=["xtc"])
 topology_file = st.file_uploader("Upload Topology File (*.gro or *.pdb file)", type=["pdb", "gro"])
 
@@ -58,7 +58,7 @@ def start_processing():
         st.success(f"Your JOB ID is: {job_id}")
 
         # Step 1: Process XTC to PDB
-        st.header("Step 1: Converting XTC to PDB")
+        st.header("Converting XTC to PDB")
         update_status(job_id, 'in_progress', 'Converting XTC to PDB files...')
         with st.spinner("Processing XTC file..."):
             pdb_files = xtc_to_pdb(xtc_path, topology_path, config['pdb_dir'])
@@ -71,7 +71,7 @@ def start_processing():
         st.write("PDB list file created... Ready for P2Rank...")
 
         # Step 2: Analyze with P2Rank
-        st.header("Step 2: Detecting Binding Pockets")
+        st.header("Detecting Binding Pockets")
         update_status(job_id, 'in_progress', 'Detecting binding pockets..')
         with st.spinner("Detecting binding pockets.."):
             run_p2rank(pdb_list_file, config['p2rank_processed_dir'])
@@ -82,7 +82,7 @@ def start_processing():
         st.write(f"Pockets data saved to {os.path.basename(pockets_csv)}")
         update_status(job_id, 'completed')
 
-        st.write(f"Your JOB ID is: {job_id}")
+        st.write(f"Your JOB ID is: {job_id} , please note it down.")
 
 # Button to start the process
 if st.button("Start Processing"):

@@ -96,7 +96,7 @@ def render_structure_with_residues(structure_file_path, res_list, residues_list)
         st.table(df)
 
 # Streamlit UI
-st.title("Pocket Selector App")
+#st.title("Pocket Selector App")
 
 # Step 1: Job ID Input
 st.header("Enter Your Job ID")

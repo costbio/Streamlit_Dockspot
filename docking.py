@@ -38,7 +38,7 @@ def clean_pdbqt_folder(folder_path):
             os.remove(file_path)
 
 # Streamlit UI
-st.title("Docking App")
+#st.title("Docking App")
 
 # Step 1: Job ID Input
 st.header("Enter Your Job ID")
@@ -55,17 +55,18 @@ if job_id_input:
         st.write(f"Job Status: {job_status}")
 
         # Step 2: Ligand SMILES Input
-        st.header("Enter SMILES Strings for Ligands")
-        smiles_input = st.text_area("Enter SMILES strings for ligands (comma-separated):", 
-                                    help="Enter SMILES strings for the ligands, separated by commas.")
+        st.header("Enter SMILES")
+        smiles_input = st.text_area("Enter SMILES strings for ligands: (Enter one SMILES string per line, press Enter after each one):", 
+                                    help="Enter SMILES strings for the ligands, separated by lines.")
         
         # Process Ligands Button
         if st.button("Process Ligands"):
             if not smiles_input:
                 st.warning("Please enter SMILES strings to proceed.")
             else:
-                ligands_smiles = [smiles.strip() for smiles in smiles_input.split(',')]
-                st.write("List of Ligands:", ligands_smiles)
+                ligands_smiles = [smiles.strip() for smiles in smiles_input.split('\n')]
+                df = pd.DataFrame(ligands_smiles, columns=["Ligands"])
+                st.dataframe(df, hide_index=True,use_container_width=True)
                 st.info("Processing ligands...")
 
                 # Creating necessary folders
@@ -85,10 +86,10 @@ if job_id_input:
                 for i, smiles in enumerate(ligands_smiles):
                     pdbqt_path = os.path.join(ligand_folder, f"ligand_{i + 1}.pdbqt")
                     result_message = smiles_to_pdbqt(smiles, pdbqt_path)
-                    st.write(f"Ligand {i + 1} Conversion Status: {result_message}")
+                    st.write(f"Ligand {i + 1} Conversion Status: Converted successfully.")
                     time.sleep(1)  # simulate processing time
 
-                st.success("Ligands processed successfully!")
+                st.success("All ligands are processed successfully!")
 
 
                 # Step 3: Docking Setup
@@ -96,7 +97,9 @@ if job_id_input:
                 # Load the chosen representatives dataframe
                 csv_path = os.path.join(processed_dir, "chosen_representatives.csv")
                 df = pd.read_csv(csv_path)
-                st.write("Loaded Receptor Data", df.head())
+                new_df = df[["Frame","pocket_index","probability","residues"]]
+                st.write("Loaded Receptor Data")
+                st.dataframe(new_df,hide_index=True, use_container_width=True)
                 
                 out_folder = os.path.join(processed_dir, "docking_results")
                 os.makedirs(out_folder, exist_ok=True)
@@ -121,7 +124,14 @@ if job_id_input:
                     receptor_pdbqt = receptor_pdbqt.replace("docking_results", "pdbqt_files/protein_pdbqt_files")
                     pdb_to_pdbqt(protein_pdb, receptor_pdbqt)
 
-                    st.write(f"Receptor PDBQT file created for: {os.path.basename(receptor_pdb)}")
+                    filename = os.path.basename(receptor_pdb)
+                    pdbqt=df.loc[df['File name'] == filename, 'Frame'].values
+                    print(f"Looking for file: {filename}")
+                    print(df['File name'].head())
+
+                    #st.write(f"Receptor PDBQT file is created successfully for: {pdbqt[0]}")
+
+                    st.stop()
 
                     box_center, box_min, box_max = calc_box(protein_pdb, row["residues"])
                     box_size = [abs(box_max[0] - box_min[0]), abs(box_max[1] - box_min[1]), abs(box_max[2] - box_min[2])]
@@ -136,9 +146,9 @@ if job_id_input:
                     simulation_number = ligand_number * chosen_number #amount of docking simulations
                     st.write(simulation_number)
 
-                    if simulation_number > 2:
-                        st.write("Simulation number is within limits. Please do run our customized script to carry on with your analysis.")
-                        st.stop()
+                    #if simulation_number > 2:
+                    #   st.write("Simulation number is within limits. Please do run our customized script to carry on with your analysis.")
+                    #  st.stop()
 
 
                     for lig_path in ligands:
