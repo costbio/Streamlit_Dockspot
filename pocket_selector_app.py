@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from data_analysis.config import get_config
+import py3Dmol
 from data_analysis.step3_clustering_conf_creator import cluster_pockets
 import nglview as nv
 from IPython.display import display
@@ -15,6 +16,12 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 
 st.markdown("""
     <style>
+    .streamlit-expander {
+        width: 700px; /* Set the width */
+        max-height: 300px; /* Set the maximum height */
+        overflow-y: auto; /* Add a scrollbar if content overflows */
+    }
+            
     .fixed-column {
         height: 600px;  /* Set a fixed height for the second column */
         overflow-y: auto;  /* Make it scrollable if content exceeds the height */
@@ -44,26 +51,55 @@ def update_status(job_id, status, step=None):
     with open(STATUS_FILE, 'w') as f:
         json.dump(statuses, f)
 
-#Function for viewing protein structures
-def render_structure_with_residues(structure_file_path, res_list):
-    # Read the .pdb file and wrap it with BytesIO
-    with open(structure_file_path, "rb") as f:
-        pdb_data = io.BytesIO(f.read())
+def render_structure_with_residues(structure_file_path, res_list, residues_list):
+    import py3Dmol
+    import stmol
 
-    # Upload the structure to the viewer
-    viewer = stmol.obj_upload(pdb_data)
+    # Expand the ~ to the full path if needed (this is optional depending on your input)
+    import os
+    structure_file_path = os.path.expanduser(structure_file_path)
 
-    # Render specific residues
-    viewer = stmol.render_pdb_resi(viewer, res_list)
+    # Read the content of the PDB file
+    with open(structure_file_path, 'r') as file:
+        pdb_data = file.read()
 
-    # Display the structure
-    stmol.showmol(viewer, height=500, width=700)
+    # Create the viewer using the PDB data as a string
+    viewer = py3Dmol.view(width=700, height=500)
+    viewer.addModel(pdb_data, "pdb")
+    viewer.addSurface(py3Dmol.VDW,{"opacity": 0.5, "color": "blue"})  # Set the default style to cartoon
+
+    viewer.addSurface(py3Dmol.VDW,{"opacity": 0.8, "color": "red"},{"resi": res_list})
+
+
+    # Zoom to fit the structure
+    viewer.zoomTo()
+
+    # Show the viewer using stmol
+    stmol.showmol(viewer, height=500, width=600)
+    
+    
+    # Define the number of items per row
+    items_per_row = 6
+
+    # Format the data into rows
+    rows = [residues_list[i:i + items_per_row] for i in range(0, len(residues_list), items_per_row)]
+
+    # Create a DataFrame with meaningful column headers
+    columns = [f"Residue {i + 1}" for i in range(items_per_row)]
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Hide the index in the table by resetting it to blank strings
+    df.index = [""] * len(df)
+
+    # Display the table
+    with st.expander("View Residues"):
+        st.table(df)
 
 # Streamlit UI
 st.title("Pocket Selector App")
 
 # Step 1: Job ID Input
-st.header("Step 1: Enter Your Job ID")
+st.header("Enter Your Job ID")
 job_id_input = st.text_input("Enter your Job ID")
 
 # Check if the job exists
@@ -80,7 +116,7 @@ if job_id_input:
         pdb_location = os.path.join(processed_dir, 'pdb_files')
 
         if os.path.exists(csv_file_path):
-            st.header("Step 2: Cluster and Generate Heatmap")
+            st.header("Cluster and Generate Heatmap")
             
             clustering_depth = st.number_input("Enter clustering depth", min_value=1, max_value=10, value=3)
 
@@ -110,7 +146,7 @@ if job_id_input:
 
             # Step 3: Generate and Display Heatmap
             if os.path.exists(output_file_path):
-                st.header("Step 3: Heatmap Visualization")
+                st.header("Found Pockets")
 
                 df = pd.read_csv(output_file_path)
                 
@@ -158,14 +194,14 @@ if job_id_input:
                 # Step 4: Heatmap rep chooser.
                 # Display a table for representatives with checkboxes
                 with col2:
-                    st.write("Chooser")
+                    st.write("Choose a conformation:")
                     with st.container():
                         # Apply the scrollable class to make the column content scrollable
                         st.markdown('<div class="stScrollBox">', unsafe_allow_html=True)
 
                         # Create checkboxes for each row label
                         chosen_points = []
-                        for i, label in enumerate(y_labels):
+                        for i, label in enumerate(y_labels[::-1]):
                             checkbox = st.checkbox(f"Select {label}", key=f"checkbox_{i}")
                             if checkbox:
                                 chosen_points.append(label)
@@ -173,7 +209,7 @@ if job_id_input:
                         st.markdown('</div>', unsafe_allow_html=True)  # Closing div tag=True
 
                 if chosen_points:
-                    st.header("3D Structures for Selected Representatives")
+                    st.header("Structures for Selected Representatives")
 
                     # Create two columns for each pair of structures
                     num_chosen_points = len(chosen_points)
@@ -192,7 +228,8 @@ if job_id_input:
                             if os.path.exists(pdb_file_1):
                                 st.subheader(f"{label_1}")
                                 nums = [col.split("_")[1] for col in df_rep_pockets.drop(columns=['File name','Frame','pocket_index','probability','residues',"frame_pocket"]).columns]
-                                render_structure_with_residues(pdb_file_1, nums)
+                                residues=st.session_state['aminoacid_list']
+                                render_structure_with_residues(pdb_file_1, nums,residues)
                             else:
                                 st.warning(f"PDB file for {label_1} not found. Path was {pdb_file_1}")
 
@@ -204,9 +241,9 @@ if job_id_input:
                                 pdb_file_2 = os.path.join(pdb_location, f"{label_2_filename}.pdb")
                                 
                                 if os.path.exists(pdb_file_2):
-                                    st.subheader(f"Structure for {label_2}")
+                                    st.subheader(f"{label_2}")
                                     nums = [col.split("_")[1] for col in df_rep_pockets.drop(columns=['File name','Frame','pocket_index','probability','residues',"frame_pocket"]).columns]
-                                    render_structure_with_residues(pdb_file_2, nums)
+                                    render_structure_with_residues(pdb_file_2, nums,st.session_state['aminoacid_list'])
                                 else:
                                     st.warning(f"PDB file for {label_2} not found. Path was {pdb_file_2}")
 
