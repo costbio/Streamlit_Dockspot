@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import json
 import pandas as pd
+import stmol
 from data_analysis.step4_docking import *
 from data_analysis.step4_ligand_handling import smiles_to_pdbqt
 import time
@@ -60,7 +61,7 @@ if job_id_input:
                                     help="Enter SMILES strings for the ligands, separated by lines.")
         
         # Process Ligands Button
-        if st.button("Process Ligands"):
+        if st.button("Run Ensemble Docking"):
             if not smiles_input:
                 st.warning("Please enter SMILES strings to proceed.")
             else:
@@ -84,7 +85,7 @@ if job_id_input:
 
                 # Loop through SMILES and process each ligand
                 for i, smiles in enumerate(ligands_smiles):
-                    pdbqt_path = os.path.join(ligand_folder, f"ligand_{i + 1}.pdbqt")
+                    pdbqt_path = os.path.join(ligand_folder, f"ligand_{smiles}.pdbqt")
                     result_message = smiles_to_pdbqt(smiles, pdbqt_path)
                     #st.write(f"Ligand {i + 1} Conversion Status: Converted successfully.")
                     time.sleep(1)  # simulate processing time
@@ -150,17 +151,18 @@ if job_id_input:
                     #   st.write("Simulation number is within limits. Please do run our customized script to carry on with your analysis.")
                     #  st.stop()
 
-
-                    for lig_path in ligands:
-                        out_path = os.path.join(out_folder, os.path.basename(lig_path)[:-6] + '_smina.sdf')
-                        with st.spinner("Docking simulation is now running... Please wait."):
+                    with st.spinner("Docking simulation is now running... Please wait."):
+                        for lig_path in ligands:
+                            out_path = os.path.join(out_folder, os.path.basename(lig_path)[:-6] + '_smina.sdf')
+                            
                             output = run_smina(lig_path, receptor_pdbqt, out_path, box_center, box_size, "smina")
-                        with st.spinner("Docking affinities are being saved... Please wait."):
+                            
                             df_output = parse_smina_log(output)
                             df_output['library'] = ligand_folder
                             df_output['ligand'] = os.path.basename(lig_path)[:-6]
-                            df_output['receptor'] = os.path.basename(receptor_pdb)
+                            df_output['receptor'] = f"Frame {df['Frame'].iloc[0]}"
                             list_outputs.append(df_output)
+                            time.sleep(0.5)
 
                 # Combine and Save Outputs
                 df_outputs = pd.concat(list_outputs, axis=0, ignore_index=True)
@@ -168,27 +170,47 @@ if job_id_input:
                 df_outputs.to_csv(df_outputs_path, index=False)
                 st.success(f"Docking completed. Results saved to {df_outputs_path}")
 
+                output_df = pd.read_csv(df_outputs_path)
+                output_df = output_df.drop(columns="library")
+                st.dataframe(output_df, hide_index=True,use_container_width=True)
+
                 # Visualize the best docking pose for a ligand and receptor
                 st.header("Visualize Docked Pose")
 
                 lig_num = [f for f in os.listdir(out_folder) if f.endswith(".sdf")]
                 file_count = len(lig_num)
 
+                # Assuming 'file_count' and 'lig_num' are defined
                 for i in range(file_count):
-                    filename= os.path.join(out_folder,lig_num[i])
-                    st.write(filename)
-                    with open(filename, 'r') as f:
-                        docked_structure = f.read()
+                    filename = os.path.join(out_folder, lig_num[i])
+                    st.write(f"Visualizing: {filename}")
 
-                        # Visualizing using Py3Dmol
-                        viewer = py3Dmol.view(width=800, height=600)
-                        viewer.addModel(docked_structure, "sdf")
-                        viewer.setStyle({'stick': {}})
-                        viewer.setBackgroundColor('white')
-                        viewer.zoomTo()
-                        viewer.show()
-                        st.write("Best docked pose visualized above.")
+                    try:
+                        with open(filename, 'r') as f:
+                            docked_structure = f.read()
 
+                            # Visualizing using Py3Dmol
+                            viewer = py3Dmol.view(width=800, height=600)
+                            protein_st = df['File name'].iloc[0]
+                            pdb_files = os.path.join(processed_dir, "pdb_files")
+                            protein_structure = os.path.join(pdb_files, f"{protein_st}.pdb")
+                            st.write(protein_structure)
+                            viewer = py3Dmol.view(width=800, height=600)
+                            viewer.addModel(docked_structure, "sdf")
+                            viewer.setStyle({'stick': {}})
+                            viewer.setBackgroundColor('white')
+                            viewer.zoomTo()
+                            stmol.showmol(viewer, height=500, width=600)
+
+                            viewer.addModel(protein_structure, "pdb")
+                            viewer.addSurface(py3Dmol.VDW, {"opacity": "1", "color": "green"},{"hetflag": False})
+
+                            st.write(f"Best docked pose for {lig_num[i]} visualized above.")
+
+                    except FileNotFoundError:
+                        st.warning(f"File {filename} not found.")
+
+                # This else block was incorrectly indented
                 else:
                     st.warning("No docked pose found.")
 

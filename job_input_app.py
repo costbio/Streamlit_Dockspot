@@ -48,7 +48,7 @@ def start_processing():
         topology_path = os.path.join(config['inputs_folder'], topology_file.name)
 
         # Save uploaded files to the job-specific folder
-        with open(xtc_path, "wb") as f:
+        with open(xtc_path, "wb") as f: 
             f.write(xtc_file.getbuffer())
         with open(topology_path, "wb") as f:
             f.write(topology_file.getbuffer())
@@ -63,7 +63,8 @@ def start_processing():
         with st.spinner("Processing XTC file..."):
             pdb_files = xtc_to_pdb(xtc_path, topology_path, config['pdb_dir'])
             filenames = [os.path.basename(path) for path in pdb_files]
-            st.write(f"Generated PDB files: {filenames}")
+            numberof_files = len(filenames)
+            st.write(f"Generated {numberof_files} PDB files...")
 
         # Write pdb_list.ds
         update_status(job_id, 'in_progress', 'Merging PDB files...')
