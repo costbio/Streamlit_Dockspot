@@ -52,7 +52,7 @@ if job_id_input:
 
         # Display job status
         job_status = load_status().get(job_id_input, {}).get('status', 'Not Started')
-        st.write(f"Job Status: {job_status}")
+        #st.write(f"Job Status: {job_status}")
 
         # Step 2: Ligand SMILES Input
         st.header("Enter SMILES")
@@ -67,7 +67,7 @@ if job_id_input:
                 ligands_smiles = [smiles.strip() for smiles in smiles_input.split('\n')]
                 df = pd.DataFrame(ligands_smiles, columns=["Ligands"])
                 st.dataframe(df, hide_index=True,use_container_width=True)
-                st.info("Processing ligands...")
+                st.info("Converting ligands...")
 
                 # Creating necessary folders
                 processed_dir = os.path.join(job_folder, "processed")
@@ -86,19 +86,19 @@ if job_id_input:
                 for i, smiles in enumerate(ligands_smiles):
                     pdbqt_path = os.path.join(ligand_folder, f"ligand_{i + 1}.pdbqt")
                     result_message = smiles_to_pdbqt(smiles, pdbqt_path)
-                    st.write(f"Ligand {i + 1} Conversion Status: Converted successfully.")
+                    #st.write(f"Ligand {i + 1} Conversion Status: Converted successfully.")
                     time.sleep(1)  # simulate processing time
 
                 st.success("All ligands are processed successfully!")
 
 
                 # Step 3: Docking Setup
-                st.header("Receptor and Ligand Docking")
+                st.header("Ensemble Docking")
                 # Load the chosen representatives dataframe
                 csv_path = os.path.join(processed_dir, "chosen_representatives.csv")
                 df = pd.read_csv(csv_path)
                 new_df = df[["Frame","pocket_index","probability","residues"]]
-                st.write("Loaded Receptor Data")
+                st.write("Chosen receptors")
                 st.dataframe(new_df,hide_index=True, use_container_width=True)
                 
                 out_folder = os.path.join(processed_dir, "docking_results")
@@ -126,12 +126,12 @@ if job_id_input:
 
                     filename = os.path.basename(receptor_pdb)
                     pdbqt=df.loc[df['File name'] == filename, 'Frame'].values
-                    print(f"Looking for file: {filename}")
-                    print(df['File name'].head())
+                    #print(f"Looking for file: {filename}")
+                    #print(df['File name'].head())
 
                     #st.write(f"Receptor PDBQT file is created successfully for: {pdbqt[0]}")
 
-                    st.stop()
+                    
 
                     box_center, box_min, box_max = calc_box(protein_pdb, row["residues"])
                     box_size = [abs(box_max[0] - box_min[0]), abs(box_max[1] - box_min[1]), abs(box_max[2] - box_min[2])]
@@ -144,7 +144,7 @@ if job_id_input:
 
 
                     simulation_number = ligand_number * chosen_number #amount of docking simulations
-                    st.write(simulation_number)
+                    #st.write(simulation_number)
 
                     #if simulation_number > 2:
                     #   st.write("Simulation number is within limits. Please do run our customized script to carry on with your analysis.")
@@ -153,12 +153,14 @@ if job_id_input:
 
                     for lig_path in ligands:
                         out_path = os.path.join(out_folder, os.path.basename(lig_path)[:-6] + '_smina.sdf')
-                        output = run_smina(lig_path, receptor_pdbqt, out_path, box_center, box_size, "smina")
-                        df_output = parse_smina_log(output)
-                        df_output['library'] = ligand_folder
-                        df_output['ligand'] = os.path.basename(lig_path)[:-6]
-                        df_output['receptor'] = os.path.basename(receptor_pdb)
-                        list_outputs.append(df_output)
+                        with st.spinner("Docking simulation is now running... Please wait."):
+                            output = run_smina(lig_path, receptor_pdbqt, out_path, box_center, box_size, "smina")
+                        with st.spinner("Docking affinities are being saved... Please wait."):
+                            df_output = parse_smina_log(output)
+                            df_output['library'] = ligand_folder
+                            df_output['ligand'] = os.path.basename(lig_path)[:-6]
+                            df_output['receptor'] = os.path.basename(receptor_pdb)
+                            list_outputs.append(df_output)
 
                 # Combine and Save Outputs
                 df_outputs = pd.concat(list_outputs, axis=0, ignore_index=True)

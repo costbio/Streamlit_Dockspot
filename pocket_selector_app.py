@@ -66,13 +66,17 @@ def render_structure_with_residues(structure_file_path, res_list, residues_list)
     # Create the viewer using the PDB data as a string
     viewer = py3Dmol.view(width=700, height=500)
     viewer.addModel(pdb_data, "pdb")
-    viewer.addSurface(py3Dmol.VDW,{"opacity": 0.5, "color": "blue"})  # Set the default style to cartoon
 
-    viewer.addSurface(py3Dmol.VDW,{"opacity": 0.8, "color": "red"},{"resi": res_list})
+    # Varsayılan tüm yapıyı cartoon olarak ayarla
+    viewer.setStyle({'cartoon': {'color': 'spectrum'}})
 
+    # Seçilen amino asitler için surface ekle (örn. kırmızı yüzey)
+    viewer.addSurface(py3Dmol.VDW, {"opacity": 0.8, "color": "red"}, {"resi": res_list})
 
-    # Zoom to fit the structure
+    # Yapıya zoom yap
     viewer.zoomTo()
+
+    
 
     # Show the viewer using stmol
     stmol.showmol(viewer, height=500, width=600)
