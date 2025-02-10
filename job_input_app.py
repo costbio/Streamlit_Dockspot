@@ -3,30 +3,32 @@ import os
 import json
 from datetime import datetime
 from data_analysis.config import get_config
-from data_analysis.step1_xtc_handling import xtc_to_pdb, write_pdb_list, run_p2rank
-from data_analysis.step2_pocketscsv import merge_to_csv
+from data_analysis.step1_extract_to_pdb import xtc_to_pdb, write_pdb_list
+from data_analysis.step2_predict_pockets import merge_to_csv , run_p2rank
 
 # Base folder for uploads
 BASE_UPLOAD_FOLDER = 'streamlit_jobs'
 os.makedirs(BASE_UPLOAD_FOLDER, exist_ok=True)
 
-# Job status file
-STATUS_FILE = 'job_status.json'
+# Base folder for job statuses
+STATUS_FOLDER = 'job_statuses'
+os.makedirs(STATUS_FOLDER, exist_ok=True)
 
-# Ensure the status file exists
-if not os.path.exists(STATUS_FILE):
-    with open(STATUS_FILE, 'w') as f:
-        json.dump({}, f)
+def get_status_file(job_id):
+    return os.path.join(STATUS_FOLDER, f'{job_id}.json')
 
-# Functions for job tracking
-def load_status():
-    with open(STATUS_FILE, 'r') as f:
-        return json.load(f)
+def load_status(job_id):
+    status_file = get_status_file(job_id)
+    if os.path.exists(status_file):
+        with open(status_file, 'r') as f:
+            return json.load(f)
+    return {}
 
 def update_status(job_id, status, step=None):
-    statuses = load_status()
-    statuses[job_id] = {'status': status, 'step': step}
-    with open(STATUS_FILE, 'w') as f:
+    statuses = load_status(job_id)
+    statuses['status'] = status
+    statuses['step'] = step
+    with open(get_status_file(job_id), 'w') as f:
         json.dump(statuses, f)
 
 # Streamlit UI
@@ -42,6 +44,8 @@ def start_processing():
     if xtc_file and topology_file:
         # Generate job ID and get config paths
         job_id = datetime.now().strftime("%Y%m%d%H%M%S")
+        st.session_state['job_id'] = job_id
+
         config = get_config(job_id)
 
         xtc_path = os.path.join(config['inputs_folder'], xtc_file.name)

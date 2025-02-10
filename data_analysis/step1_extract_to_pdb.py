@@ -28,12 +28,7 @@ def write_pdb_list(pdb_dir, output_file):
     print(f"PDB list written to {output_file}")
     return output_file
 
-def run_p2rank(pdb_list_file, output_dir, threads=4):
-    """Run P2Rank with the specified list of PDB files."""
-    command = f'{p2rank_dir} predict {pdb_list_file} -o {output_dir} -threads {threads}'
-    subprocess.call(command, shell=True)
-    print(f"P2Rank output written to {output_dir}")
-    return output_dir
+
 
 # If you want the script to remain executable standalone
 if __name__ == "__main__":

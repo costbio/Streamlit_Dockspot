@@ -1,7 +1,14 @@
 import os
 import csv
 import re
+import subprocess
 
+def run_p2rank(pdb_list_file, output_dir, threads=4):
+    """Run P2Rank with the specified list of PDB files."""
+    command = f'prank predict {pdb_list_file} -o {output_dir} -threads {threads}'
+    subprocess.call(command, shell=True)
+    print(f"P2Rank output written to {output_dir}")
+    return output_dir
 
 def extract_frame_number(filename):
     """Extract frame number from filenames like '2XIR_traj_1.pdb_predictions.csv'."""
