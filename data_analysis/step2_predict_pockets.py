@@ -50,7 +50,7 @@ def merge_to_csv(processed_dir, pdb_file_list):
         csvwriter = csv.writer(csvfile)
 
         # Write header
-        csvwriter.writerow(["File name", 'Frame', "pocket_index", "probability", "residues"])
+        csvwriter.writerow(["File name", 'Frame', "pocket_index", "probability", "residues", "surf_atom_ids"])
 
         # Iterate through PDB files
         for pdb_file in pdb_list:
@@ -80,9 +80,10 @@ def merge_to_csv(processed_dir, pdb_file_list):
                         full_name = os.path.basename(pdb_file)[:-4]  # Get the PDB file name as the File name
                         probability = row[' probability']
                         residues = row[' residue_ids']
+                        surf_atom_ids = row[' surf_atom_ids']
 
                         # Write data to the CSV file
-                        csvwriter.writerow([full_name, frame_number, pocket_index, probability, residues])
+                        csvwriter.writerow([full_name, frame_number, pocket_index, probability, residues,surf_atom_ids])
     return csv_filename
 
     # Sort the CSV file by frame_number as integers

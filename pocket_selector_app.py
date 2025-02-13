@@ -89,7 +89,9 @@ def update_status(job_id, status, step=None):
     with open(get_status_file(job_id), 'w') as f:
         json.dump(statuses, f)
 
-def render_structure_with_residues(structure_file_path, res_list, residues_list):
+
+
+def render_structure_with_residues(structure_file_path, residues_list):
     # Expand the ~ to the full path if needed
     structure_file_path = os.path.expanduser(structure_file_path)
     # Read the content of the PDB file
@@ -101,7 +103,7 @@ def render_structure_with_residues(structure_file_path, res_list, residues_list)
     # Set the entire structure to cartoon style
     viewer.setStyle({'cartoon': {'color': 'spectrum'}})
     # Add a surface for the selected residues (e.g. in red)
-    viewer.addSurface(py3Dmol.VDW, {"opacity": 0.8, "color": "red"}, {"resi": res_list})
+    viewer.addSurface(py3Dmol.VDW, {"opacity": 0.8, "color": "red"}, {"serial": residues_list})
     # Zoom to the structure
     viewer.zoomTo()
     # Show the viewer using stmol
@@ -110,10 +112,10 @@ def render_structure_with_residues(structure_file_path, res_list, residues_list)
     # Format residues list in a table
     items_per_row = 6
     rows = [residues_list[i:i + items_per_row] for i in range(0, len(residues_list), items_per_row)]
-    columns = [f"Residue {i + 1}" for i in range(items_per_row)]
+    columns = [f"Atom {i + 1}" for i in range(items_per_row)]
     df = pd.DataFrame(rows, columns=columns)
     df.index = [""] * len(df)
-    with st.expander("View Residues"):
+    with st.expander("View Atom Numbers"):
         st.table(df)
 
 # ------------------------
@@ -155,12 +157,13 @@ if job_id_input:
                 st.session_state.clustering_started = True
                 update_status(st.session_state.job_id, 'in_progress', 'Clustering...')
                 with st.spinner("Clustering..."):
-                    df_rep_pockets, full_heatmap, rep_heatmap, dataindex, repdataindex, aminoacid_list = cluster_pockets(
+                    df_rep_pockets, full_heatmap, rep_heatmap, dataindex, repdataindex, aminoacid_list, surface_atoms = cluster_pockets(
                         p2rank_output_folder=p2rank_dir, 
                         pdb_location=pdb_location, 
                         depth=clustering_depth,
                         plot=True
                     )
+
                     # Save results into session state
                     st.session_state.df_rep_pockets = df_rep_pockets
                     st.session_state.full_heatmap = full_heatmap
@@ -168,6 +171,8 @@ if job_id_input:
                     st.session_state.dataindex = dataindex
                     st.session_state.repdataindex = repdataindex
                     st.session_state.aminoacid_list = aminoacid_list
+                    st.session_state.surface_atoms = surface_atoms  # Will be updated later
+
                     st.session_state.clustering_done = True
 
                     # Save representatives CSV using new job id configuration
@@ -249,6 +254,7 @@ if job_id_input:
                         if submitted:
                             st.session_state.chosen_points = form_chosen_points
                             st.success("Selections saved!")
+                            
                 
                 # Display structures if any selections have been made
                 if st.session_state.chosen_points:
@@ -261,6 +267,8 @@ if job_id_input:
                         # Left structure
                         with col_left:
                             label_1 = chosen_points[i]
+                            #atoms = df.loc["Frame:35 Index:1", "surf_atom_ids"]
+
                             df_rep = st.session_state.df_rep_pockets
                             # Retrieve the filename corresponding to the label
                             label_1_filename = df_rep.loc[df_rep.index.isin([label_1]), 'File name'].iloc[0]
@@ -272,13 +280,16 @@ if job_id_input:
                                     columns=['File name', 'Frame', 'pocket_index', 'probability', 'residues', "frame_pocket"]
                                 ).columns]
                                 residues = st.session_state.aminoacid_list
-                                render_structure_with_residues(pdb_file_1, nums, residues)
+                                atom_numbers = st.session_state.surface_atoms[chosen_points[i]]
+
+                                render_structure_with_residues(pdb_file_1, atom_numbers)
                             else:
                                 st.warning(f"PDB file for {label_1} not found. Path was {pdb_file_1}")
                         # Right structure (if exists)
                         if i + 1 < num_chosen_points:
                             with col_right:
                                 label_2 = chosen_points[i + 1]
+                                
                                 df_rep = st.session_state.df_rep_pockets
                                 label_2_filename = df_rep.loc[df_rep.index.isin([label_2]), 'File name'].iloc[0]
                                 pdb_file_2 = os.path.join(pdb_location, f"{label_2_filename}.pdb")
@@ -287,7 +298,8 @@ if job_id_input:
                                     nums = [col.split("_")[1] for col in df_rep.drop(
                                         columns=['File name', 'Frame', 'pocket_index', 'probability', 'residues', "frame_pocket"]
                                     ).columns]
-                                    render_structure_with_residues(pdb_file_2, nums, st.session_state.aminoacid_list)
+                                    atom_numbers2 = st.session_state.surface_atoms[chosen_points[i]]
+                                    render_structure_with_residues(pdb_file_2,atom_numbers2)
                                 else:
                                     st.warning(f"PDB file for {label_2} not found. Path was {pdb_file_2}")
 
