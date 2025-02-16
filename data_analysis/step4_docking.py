@@ -84,37 +84,46 @@ def run_smina(
     output_text: str
         The output of the Smina calculation.
     """
-    output_text = subprocess.run(
-        [
-            smina_exe,
-            "--ligand",
-            str(ligand_path),
-            "--receptor",
-            str(protein_path),
-            "--out",
-            str(out_path),
-            "--center_x",
-            str(pocket_center[0]),
-            "--center_y",
-            str(pocket_center[1]),
-            "--center_z",
-            str(pocket_center[2]),
-            "--size_x",
-            str(pocket_size[0]),
-            "--size_y",
-            str(pocket_size[1]),
-            "--size_z",
-            str(pocket_size[2]),
-            "--num_modes",
-            str(num_poses),
-            "--exhaustiveness",
-            str(exhaustiveness),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,  # needed to capture output text
-    ).stdout
-    return output_text
+    try:
+        result = subprocess.run(
+            [
+                smina_exe,
+                "--ligand",
+                str(ligand_path),
+                "--receptor",
+                str(protein_path),
+                "--out",
+                str(out_path),
+                "--center_x",
+                str(pocket_center[0]),
+                "--center_y",
+                str(pocket_center[1]),
+                "--center_z",
+                str(pocket_center[2]),
+                "--size_x",
+                str(pocket_size[0]),
+                "--size_y",
+                str(pocket_size[1]),
+                "--size_z",
+                str(pocket_size[2]),
+                "--num_modes",
+                str(num_poses),
+                "--exhaustiveness",
+                str(exhaustiveness),
+                '--log', 'smina_debug.log'
+            ],
+            check=True,
+            capture_output=True,
+            text=True,  # needed to capture output text
+        )
+        return result.stdout, result.stderr
+    except subprocess.CalledProcessError as e:
+        print(f"Error running smina: {e}")
+        print(f"Command: {e.cmd}")
+        print(f"Return code: {e.returncode}")
+        print(f"Output: {e.output}")
+        print(f"Error output: {e.stderr}")
+        raise
 
 
 def parse_smina_log(text):

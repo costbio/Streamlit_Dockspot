@@ -82,15 +82,17 @@ def load_status(job_id):
             return json.load(f)
     return {}
 
-def update_status(job_id, status, step=None):
-    statuses = load_status(job_id)
+def update_status(newjob_id, oldjobid, status, step=None):
+    statuses = load_status(newjob_id)
     statuses['status'] = status
     statuses['step'] = step
-    with open(get_status_file(job_id), 'w') as f:
+    statuses['first_job_id'] = oldjobid
+    with open(get_status_file(newjob_id), 'w') as f:
         json.dump(statuses, f)
 
 
 
+                
 def render_structure_with_residues(structure_file_path, residues_list):
     # Expand the ~ to the full path if needed
     structure_file_path = os.path.expanduser(structure_file_path)
@@ -130,32 +132,43 @@ if job_id_input:
     job_folder = os.path.join(BASE_JOB_FOLDER, st.session_state.job_id)
     if os.path.exists(job_folder):
         st.success(f"Job found: {job_id_input}")
-        
-        # Generate a NEW job id and config for outputs if not already created
         if st.session_state.new_job_id is None:
             new_job_id = datetime.now().strftime("%Y%m%d%H%M%S")
             st.session_state.new_job_id = new_job_id
-            st.session_state.new_config = get_config(new_job_id)
+            st.session_state.new_config = get_config(new_job_id)    
+
+
+
         st.write(f"Your new Job ID is: {st.session_state.new_job_id}")
+
+        update_status(st.session_state.new_job_id,st.session_state.job_id, 'in_progress', 'Files uploaded')
         
         # Define folder paths using the input (old) job id
         processed_dir = os.path.join(job_folder, 'processed')
         p2rank_dir = os.path.join(processed_dir, "p2rank_output")
         csv_file_path = os.path.join(p2rank_dir, 'pockets.csv')
         # Output file uses the new job id's configuration
-        output_file_path = os.path.join(st.session_state.new_config['processed_dir'], 'representatives.csv')
+        if st.session_state.new_config is None:
+            st.error("New configuration is not set. Please ensure the new job configuration is properly initialized.")
+        else:
+            os.makedirs(st.session_state.new_config['processed_dir'], exist_ok=True)
+            output_file_path = os.path.join(st.session_state.new_config['processed_dir'], 'representatives.csv')
+
+        
         pdb_location = os.path.join(processed_dir, 'pdb_files')
 
         if os.path.exists(csv_file_path):
             st.header("Cluster and Generate Heatmap")
             clustering_depth = st.number_input("Enter clustering depth", min_value=1, max_value=10, value=3)
 
+
+
             # ------------------------
             # Clustering Button
             # ------------------------
             if st.button("Start Clustering"):
                 st.session_state.clustering_started = True
-                update_status(st.session_state.job_id, 'in_progress', 'Clustering...')
+                update_status(st.session_state.new_job_id,st.session_state.job_id, 'in_progress', 'Clustering...')
                 with st.spinner("Clustering..."):
                     df_rep_pockets, full_heatmap, rep_heatmap, dataindex, repdataindex, aminoacid_list, surface_atoms = cluster_pockets(
                         p2rank_output_folder=p2rank_dir, 
@@ -178,7 +191,7 @@ if job_id_input:
                     # Save representatives CSV using new job id configuration
                     df_rep_pockets.to_csv(output_file_path, index=False)
                     st.success("Clustering completed. Representatives saved.")
-                    update_status(st.session_state.job_id, 'completed', 'Clustering')
+                    update_status(st.session_state.new_job_id, st.session_state.job_id,'completed', 'Clustering')
 
             # ------------------------
             # Display Results if Clustering Completed

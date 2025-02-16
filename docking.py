@@ -8,28 +8,44 @@ from data_analysis.step4_ligand_handling import smiles_to_pdbqt
 import time
 import py3Dmol
 import numpy as np
+import subprocess
+
+if 'new_job_id' not in st.session_state:
+    st.session_state.new_job_id = None
 
 # Base folder for jobs
 BASE_JOB_FOLDER = 'streamlit_jobs'
 
-# Job status file
-STATUS_FILE = 'job_status.json'
+STATUS_FOLDER = 'job_statuses'
 
-# Ensure the status file exists
-if not os.path.exists(STATUS_FILE):
-    with open(STATUS_FILE, 'w') as f:
-        json.dump({}, f)
+def get_status_file(job_id):
+    return os.path.join(STATUS_FOLDER, f'{job_id}.json')
 
-# Functions for job tracking
-def load_status():
-    with open(STATUS_FILE, 'r') as f:
-        return json.load(f)
+def load_status(job_id):
+    status_file = get_status_file(job_id)
+    if os.path.exists(status_file):
+        with open(status_file, 'r') as f:
+            return json.load(f)
+    return {}
 
-def update_status(job_id, status, step=None):
-    statuses = load_status()
-    statuses[job_id] = {'status': status, 'step': step}
-    with open(STATUS_FILE, 'w') as f:
+def update_status(newjob_id, status, step=None):
+    statuses = load_status(newjob_id)
+    statuses['status'] = status
+    statuses['step'] = step
+    
+    with open(get_status_file(newjob_id), 'w') as f:
         json.dump(statuses, f)
+
+def get_jobid(jobid):
+    file = os.path.join(STATUS_FOLDER, f'{jobid}.json')
+    
+    with open(file, 'r') as file:
+        data = json.load(file)
+    job_id = data["first_job_id"]
+    return job_id
+
+
+
 
 # Function to clean the pdbqt_files folder
 def clean_pdbqt_folder(folder_path):
@@ -39,39 +55,45 @@ def clean_pdbqt_folder(folder_path):
             os.remove(file_path)
 
 # Streamlit UI
-#st.title("Docking App")
+#st.set_page_config(page_title="Docking App", layout="wide")
+st.title("Docking App")
 
-# Step 1: Job ID Input
-st.header("Enter Your Job ID")
-job_id_input = st.text_input("Enter your Job ID")
 
-# Check if the job exists
+st.header("Job Configuration")
+job_id_input = st.text_input("Enter your Job ID", value=st.session_state.get("new_job_id", ""))
+smiles_input = st.text_area("Enter SMILES strings for ligands (one per line):", 
+                                help="Enter SMILES strings for the ligands, separated by lines.")
+run_button = st.button("Run Ensemble Docking")
+
+# Main content
 if job_id_input:
+    if st.session_state.new_job_id is None:
+        st.session_state.new_job_id = job_id_input
     job_folder = os.path.join(BASE_JOB_FOLDER, job_id_input)
+    old_job_folder = os.path.join(BASE_JOB_FOLDER, get_jobid(st.session_state.new_job_id))
     if os.path.exists(job_folder):
         st.success(f"Job found: {job_id_input}")
 
         # Display job status
-        job_status = load_status().get(job_id_input, {}).get('status', 'Not Started')
-        #st.write(f"Job Status: {job_status}")
+        job_status = load_status(job_id_input).get('status', 'Not Started')
+        st.write(f"Job Status: {job_status}")
+        oldjobid = get_jobid(st.session_state.new_job_id)
+        st.write(oldjobid)
 
-        # Step 2: Ligand SMILES Input
-        st.header("Enter SMILES")
-        smiles_input = st.text_area("Enter SMILES strings for ligands: (Enter one SMILES string per line, press Enter after each one):", 
-                                    help="Enter SMILES strings for the ligands, separated by lines.")
-        
-        # Process Ligands Button
-        if st.button("Run Ensemble Docking"):
+        if run_button:
             if not smiles_input:
                 st.warning("Please enter SMILES strings to proceed.")
             else:
                 ligands_smiles = [smiles.strip() for smiles in smiles_input.split('\n')]
                 df = pd.DataFrame(ligands_smiles, columns=["Ligands"])
-                st.dataframe(df, hide_index=True,use_container_width=True)
+                st.dataframe(df, hide_index=True, use_container_width=True)
                 st.info("Converting ligands...")
 
                 # Creating necessary folders
                 processed_dir = os.path.join(job_folder, "processed")
+                old_processed_dir = os.path.join(old_job_folder, "processed")
+                os.makedirs(processed_dir, exist_ok=True)
+
                 pdbqt_folder = os.path.join(processed_dir, "pdbqt_files")
                 os.makedirs(pdbqt_folder, exist_ok=True)
 
@@ -84,14 +106,14 @@ if job_id_input:
                 os.makedirs(prot_pdbqt_folder, exist_ok=True)
 
                 # Loop through SMILES and process each ligand
+                progress_bar = st.progress(0)
                 for i, smiles in enumerate(ligands_smiles):
                     pdbqt_path = os.path.join(ligand_folder, f"ligand_{smiles}.pdbqt")
                     result_message = smiles_to_pdbqt(smiles, pdbqt_path)
-                    #st.write(f"Ligand {i + 1} Conversion Status: Converted successfully.")
+                    progress_bar.progress((i + 1) / len(ligands_smiles))
                     time.sleep(1)  # simulate processing time
 
                 st.success("All ligands are processed successfully!")
-
 
                 # Step 3: Docking Setup
                 st.header("Ensemble Docking")
@@ -100,15 +122,19 @@ if job_id_input:
                 df = pd.read_csv(csv_path)
                 new_df = df[["Frame","pocket_index","probability","residues"]]
                 st.write("Chosen receptors")
-                st.dataframe(new_df,hide_index=True, use_container_width=True)
+                st.dataframe(new_df, hide_index=True, use_container_width=True)
                 
                 out_folder = os.path.join(processed_dir, "docking_results")
                 os.makedirs(out_folder, exist_ok=True)
 
                 # Iterate through receptors and ligands
                 list_outputs = []
+                total_simulations = len(ligands_smiles) * len(df)
+                completed_simulations = 0
+                docking_progress_bar = st.progress(0)
+
                 for index, row in df.iterrows():
-                    receptor_pdb = os.path.join(processed_dir, "pdb_files", f"{row['File name']}.pdb")
+                    receptor_pdb = os.path.join(old_processed_dir, "pdb_files", f"{row['File name']}.pdb")
                     from prody import *
                     syst = parsePDB(receptor_pdb)
                     protein = syst.select('protein')
@@ -127,12 +153,6 @@ if job_id_input:
 
                     filename = os.path.basename(receptor_pdb)
                     pdbqt=df.loc[df['File name'] == filename, 'Frame'].values
-                    #print(f"Looking for file: {filename}")
-                    #print(df['File name'].head())
-
-                    #st.write(f"Receptor PDBQT file is created successfully for: {pdbqt[0]}")
-
-                    
 
                     box_center, box_min, box_max = calc_box(protein_pdb, row["residues"])
                     box_size = [abs(box_max[0] - box_min[0]), abs(box_max[1] - box_min[1]), abs(box_max[2] - box_min[2])]
@@ -143,26 +163,26 @@ if job_id_input:
                     chosens = [f for f in os.listdir(prot_pdbqt_folder) if f.endswith(".pdbqt")]
                     chosen_number = len(chosens)
 
-
                     simulation_number = ligand_number * chosen_number #amount of docking simulations
-                    #st.write(simulation_number)
-
-                    #if simulation_number > 2:
-                    #   st.write("Simulation number is within limits. Please do run our customized script to carry on with your analysis.")
-                    #  st.stop()
 
                     with st.spinner("Docking simulation is now running... Please wait."):
                         for lig_path in ligands:
                             out_path = os.path.join(out_folder, os.path.basename(lig_path)[:-6] + '_smina.sdf')
                             
-                            output = run_smina(lig_path, receptor_pdbqt, out_path, box_center, box_size, "smina")
-                            
+                            output, error = run_smina(lig_path, receptor_pdbqt, out_path, box_center, box_size, "smina")
+                            st.write(output)
+                            st.write(error)
+                            print(output, error)
                             df_output = parse_smina_log(output)
                             df_output['library'] = ligand_folder
                             df_output['ligand'] = os.path.basename(lig_path)[:-6]
                             df_output['receptor'] = f"Frame {df['Frame'].iloc[0]}"
                             list_outputs.append(df_output)
                             time.sleep(0.5)
+
+                            # Update progress bar
+                            completed_simulations += 1
+                            docking_progress_bar.progress(completed_simulations / total_simulations)
 
                 # Combine and Save Outputs
                 df_outputs = pd.concat(list_outputs, axis=0, ignore_index=True)
@@ -172,7 +192,7 @@ if job_id_input:
 
                 output_df = pd.read_csv(df_outputs_path)
                 output_df = output_df.drop(columns="library")
-                st.dataframe(output_df, hide_index=True,use_container_width=True)
+                st.dataframe(output_df, hide_index=True, use_container_width=True)
 
                 # Visualize the best docking pose for a ligand and receptor
                 st.header("Visualize Docked Pose")
@@ -180,7 +200,6 @@ if job_id_input:
                 lig_num = [f for f in os.listdir(out_folder) if f.endswith(".sdf")]
                 file_count = len(lig_num)
 
-                # Assuming 'file_count' and 'lig_num' are defined
                 for i in range(file_count):
                     filename = os.path.join(out_folder, lig_num[i])
                     st.write(f"Visualizing: {filename}")
@@ -210,7 +229,6 @@ if job_id_input:
                     except FileNotFoundError:
                         st.warning(f"File {filename} not found.")
 
-                # This else block was incorrectly indented
                 else:
                     st.warning("No docked pose found.")
 
